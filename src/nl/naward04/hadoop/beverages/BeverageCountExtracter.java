@@ -24,6 +24,12 @@ import com.aliasi.dict.ExactDictionaryChunker;
 import com.aliasi.dict.MapDictionary;
 import com.aliasi.tokenizer.IndoEuropeanTokenizerFactory;
 
+/**
+ * Main Mapper class for counting beverages on a WebPage
+ *
+ * Takes as input a Key-value pair where the key is a LongWritable and the Value is a WarcRecord
+ * Outputs a Key-value pair where the key is a countrycode string and the value is a BeverageMap (HashMap) with keys as beverage strings and the value a longwritable count
+ */
 public class BeverageCountExtracter extends Mapper<LongWritable, WarcRecord, Text, BeverageMapWritable> {
 
 	private final Set<String> invalidTLDs = new TreeSet<String>();
@@ -41,7 +47,7 @@ public class BeverageCountExtracter extends Mapper<LongWritable, WarcRecord, Tex
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void setup(Context context) throws IOException, InterruptedException {
-		BufferedReader reader = new BufferedReader(new InputStreamReader(getClass().getClassLoader().getResourceAsStream("drinklist.csv")));		
+		BufferedReader reader = new BufferedReader(new InputStreamReader(getClass().getClassLoader().getResourceAsStream("drinklist.csv"), "UTF-8"));
 		try {
 			while(true) {
 				String drink = reader.readLine().toLowerCase();
@@ -84,13 +90,16 @@ public class BeverageCountExtracter extends Mapper<LongWritable, WarcRecord, Tex
 						
 						//Try via the hostname
 						String country = null;
-						String host = value.header.warcInetAddress.getHostName();
-						if (host != null){	
-							String tld = host.substring(host.lastIndexOf('.') + 1).toLowerCase();
-							if (tld.length() == 2 && tld.matches("[a-z]{2}")){
-								if(!invalidTLDs.contains(tld)) {
-									country = tld;
-									found = true;
+						if (value.header.warcTargetUriUri != null) {
+							String host = value.header.warcTargetUriUri.getHost();
+							if (host != null) {
+								String tld = host.substring(
+										host.lastIndexOf('.') + 1).toLowerCase();
+								if (tld.length() == 2 && tld.matches("[a-z]{2}")) {
+									if (!invalidTLDs.contains(tld)) {
+										country = tld;
+										found = true;
+									}
 								}
 							}
 						}
@@ -100,6 +109,7 @@ public class BeverageCountExtracter extends Mapper<LongWritable, WarcRecord, Tex
 							String IP = value.header.warcIpAddress;
 							if (IP != null) {
 								country = list.getCountry(AddressRangeList.convertAddressToLong(IP)).toLowerCase();
+								found = true;
 							}
 						}
 						
